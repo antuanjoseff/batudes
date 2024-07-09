@@ -28,8 +28,8 @@ class FullMapState extends State<FullMap> {
   MapLibreMapController? controller;
   int npoints = 0;
   var isLight = true;
-  double? latitude;
-  double? longitude;
+  late double latitude;
+  late double longitude;
   double? accuracy;
   double? altitude;
   double? bearing;
@@ -55,26 +55,36 @@ class FullMapState extends State<FullMap> {
         title: 'Background service is running',
         message: 'Background location in progress',
       );
-      print('------------------------');
-      print('------------------------');
-      print('START SERVICE');
-      print('------------------------');
-      print('------------------------');
+
       await BackgroundLocation.startLocationService(distanceFilter: 1);
       BackgroundLocation.getLocationUpdates((location) {
+        print(location.latitude);
+        print(location.longitude);
+        print(location.altitude);
+        print(location.accuracy);
         setState(() {
-          latitude = location.latitude;
-          longitude = location.longitude;
+          latitude = location.latitude!;
+          longitude = location.longitude!;
           accuracy = location.accuracy;
           altitude = location.altitude;
           bearing = location.bearing;
           speed = location.speed;
           time = location.time;
         });
-        print(latitude);
-        print(longitude);
-        print(altitude);
-        print(accuracy);
+
+        controller!.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            const CameraPosition(
+                              target: LatLng(latitude, longitude),
+                            ),
+                          ),
+                        )
+                        .then(
+                          (result) => debugPrint(
+                              "mapController.animateCamera() returned $result"),
+                        );
+        );
+
         controller!.setGeoJsonSource('myLocation', {
           "type": "FeatureCollection",
           "features": [
@@ -126,7 +136,7 @@ class FullMapState extends State<FullMap> {
       "myLocation",
       "myLocation",
       CircleLayerProperties(
-        circleRadius: 4,
+        circleRadius: 10,
         circleColor: Colors.blue.toHexStringRGB(),
       ),
     );
