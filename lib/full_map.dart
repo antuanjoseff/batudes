@@ -28,18 +28,17 @@ class FullMapState extends State<FullMap> {
   MapLibreMapController? controller;
   int npoints = 0;
   var isLight = true;
-  late double latitude;
-  late double longitude;
-  double? accuracy;
-  double? altitude;
-  double? bearing;
-  double? speed;
-  double? time;
+  double? latitude = 0;
+  double? longitude = 0;
+  double? accuracy = 0;
+  double? altitude = 0;
+  double? bearing = 0;
+  double? speed = 0;
+  double? time = 0;
 
   @override
   void initState() {
     super.initState(); //comes first for initState();
-    checkGps();
   }
 
   loc.Location location =
@@ -50,6 +49,8 @@ class FullMapState extends State<FullMap> {
       location.requestService();
     }
     gpsEnabled = await location.serviceEnabled();
+    print('----------------');
+    print(gpsEnabled);
     if (gpsEnabled) {
       await BackgroundLocation.setAndroidNotification(
         title: 'Background service is running',
@@ -58,13 +59,14 @@ class FullMapState extends State<FullMap> {
 
       await BackgroundLocation.startLocationService(distanceFilter: 1);
       BackgroundLocation.getLocationUpdates((location) {
+        print('GPS DATA');
         print(location.latitude);
         print(location.longitude);
         print(location.altitude);
         print(location.accuracy);
         setState(() {
-          latitude = location.latitude!;
-          longitude = location.longitude!;
+          latitude = location.latitude;
+          longitude = location.longitude;
           accuracy = location.accuracy;
           altitude = location.altitude;
           bearing = location.bearing;
@@ -72,27 +74,30 @@ class FullMapState extends State<FullMap> {
           time = location.time;
         });
 
+        final newLoc = LatLng(location.latitude!, location.longitude!);
+        
         controller!.animateCamera(
-                          CameraUpdate.newCameraPosition(
-                            const CameraPosition(
-                              target: LatLng(latitude, longitude),
-                            ),
-                          ),
-                        )
-                        .then(
-                          (result) => debugPrint(
-                              "mapController.animateCamera() returned $result"),
-                        );
-        );
-
-        controller!.setGeoJsonSource('myLocation', {
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: newLoc,
+                zoom: 10
+                // zoom: controller!.cameraPosition.zoom
+              ),
+            ),
+          )
+          .then(
+            (result) => debugPrint(
+                "mapController.animateCamera() returned $result"),
+          );
+        
+         controller!.setGeoJsonSource("myLocation", {
           "type": "FeatureCollection",
           "features": [
             {
               "type": "Feature",
               "properties": {},
               "geometry": {
-                "coordinates": [longitude, latitude],
+                "coordinates": [location.longitude, location.latitude],
                 "type": "Point"
               }
             }
@@ -102,8 +107,9 @@ class FullMapState extends State<FullMap> {
     }
   }
 
-  _onMapCreated(MapLibreMapController controller) async {
-    this.controller = controller;
+  _onMapCreated(MapLibreMapController mapController) async {
+    controller = mapController;
+    checkGps();
 
     // await gpsChecker();
 
@@ -148,7 +154,7 @@ class FullMapState extends State<FullMap> {
         appBar: AppBar(title: Text(npoints.toString())),
         body: MapLibreMap(
           // myLocationEnabled: true,
-
+          trackCameraPosition: true,
           onMapCreated: _onMapCreated,
           initialCameraPosition: const CameraPosition(
             target: LatLng(42.0, 3.0),
