@@ -1,3 +1,4 @@
+import 'package:batuda/check_connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:http/http.dart' as http;
@@ -5,6 +6,7 @@ import 'page.dart';
 import 'dart:convert';
 import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class FullMapPage extends ExamplePage {
   const FullMapPage({super.key})
@@ -39,6 +41,15 @@ class FullMapState extends State<FullMap> {
   @override
   void initState() {
     super.initState(); //comes first for initState();
+    
+    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+      if (result == ConnectivityResult.none) {
+        print('************************************');
+        print('Handle the new connectivity status!');
+        print('************************************');
+      }
+    });
+    
   }
 
   loc.Location location =
@@ -46,11 +57,13 @@ class FullMapState extends State<FullMap> {
 
   Future checkGps() async {
     if (!await location.serviceEnabled()) {
-      location.requestService();
+      await location.requestService();
     }
+
     gpsEnabled = await location.serviceEnabled();
     print('----------------');
     print(gpsEnabled);
+
     if (gpsEnabled) {
       await BackgroundLocation.setAndroidNotification(
         title: 'Background service is running',
@@ -77,13 +90,7 @@ class FullMapState extends State<FullMap> {
         final newLoc = LatLng(location.latitude!, location.longitude!);
         
         controller!.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: newLoc,
-                zoom: 10
-                // zoom: controller!.cameraPosition.zoom
-              ),
-            ),
+            CameraUpdate.newLatLng(newLoc)
           )
           .then(
             (result) => debugPrint(
@@ -109,11 +116,8 @@ class FullMapState extends State<FullMap> {
 
   _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
-    checkGps();
-
-    // await gpsChecker();
-
-    // mapController = controller;
+    await checkConnection();
+    await checkGps();
   }
 
   _onStyleLoadedCallback() async {
