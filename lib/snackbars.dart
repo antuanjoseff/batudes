@@ -1,5 +1,26 @@
 import 'package:flutter/material.dart';
 
+void showSnackbar (context, type, myText) {
+  ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    type == 'success' ? Icons.thumb_up : Icons.warning_rounded, 
+                    color: Colors.white
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Text(myText)
+                  )
+                ],
+              ),
+              backgroundColor: type=='success' ? Colors.green : Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+}
+
 void snackBarConnectionRestored (context) {
   ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

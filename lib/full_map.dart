@@ -1,3 +1,4 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:batuda/check_connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -60,6 +61,17 @@ class FullMapState extends State<FullMap> {
         _onStyleLoadedCallback();
       }
     });
+
+    Geolocator.getServiceStatusStream().listen(
+      (ServiceStatus status) {
+        if (status == ServiceStatus.enabled) {
+          showSnackbar(context, 'success', 'GPS enabled!!');
+        } else {
+          showSnackbar(context, 'error', 'GPS disabled!!');
+        }
+      }
+    );
+
   }
 
   loc.Location location =
@@ -80,11 +92,7 @@ class FullMapState extends State<FullMap> {
 
       await BackgroundLocation.startLocationService(distanceFilter: 1);
       BackgroundLocation.getLocationUpdates((location) {
-        print('GPS DATA');
-        print(location.latitude);
-        print(location.longitude);
-        print(location.altitude);
-        print(location.accuracy);
+        
         setState(() {
           latitude = location.latitude;
           longitude = location.longitude;
@@ -125,10 +133,9 @@ class FullMapState extends State<FullMap> {
 
   _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
-    var myLoc = createJsonLocation(latitude, longitude);
-    print('..............................');
-    print(myLoc);
-    print('..............................');
+    print('????????????????????????');
+    print(location);
+    var myLoc = createJsonLocation(latitude!, longitude!);
     await controller!.addSource("myLocation", GeojsonSourceProperties(data: myLoc));
     await controller!.addCircleLayer(
       "myLocation",
