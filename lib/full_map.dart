@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:http/http.dart' as http;
 import 'page.dart';
+import 'snackbars.dart';
+import 'createJsonLocation.dart';
 import 'dart:convert';
 import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
 import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 class FullMapPage extends ExamplePage {
   const FullMapPage({super.key})
@@ -37,6 +40,7 @@ class FullMapState extends State<FullMap> {
   double? bearing = 0;
   double? speed = 0;
   double? time = 0;
+  bool hasInternet = false;
 
   @override
   void initState() {
@@ -44,12 +48,18 @@ class FullMapState extends State<FullMap> {
     
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
-        print('************************************');
-        print('Handle the new connectivity status!');
-        print('************************************');
+          setState(() {
+            hasInternet = false;
+          });
+        snackBarConnectionLost(context);          
+      } else {
+          setState(() {
+            hasInternet = true;
+          });
+        snackBarConnectionRestored(context);
+        _onStyleLoadedCallback();
       }
     });
-    
   }
 
   loc.Location location =
@@ -61,8 +71,6 @@ class FullMapState extends State<FullMap> {
     }
 
     gpsEnabled = await location.serviceEnabled();
-    print('----------------');
-    print(gpsEnabled);
 
     if (gpsEnabled) {
       await BackgroundLocation.setAndroidNotification(
@@ -88,16 +96,8 @@ class FullMapState extends State<FullMap> {
         });
 
         final newLoc = LatLng(location.latitude!, location.longitude!);
-        
-        controller!.animateCamera(
-            CameraUpdate.newLatLng(newLoc)
-          )
-          .then(
-            (result) => debugPrint(
-                "mapController.animateCamera() returned $result"),
-          );
-        
-         controller!.setGeoJsonSource("myLocation", {
+
+        controller!.setGeoJsonSource("myLocation", {
           "type": "FeatureCollection",
           "features": [
             {
@@ -110,38 +110,26 @@ class FullMapState extends State<FullMap> {
             }
           ]
         });
+
+        controller!.animateCamera(
+            CameraUpdate.newLatLng(newLoc)
+          )
+          .then(
+            (result) => debugPrint(
+                "mapController.animateCamera() returned $result"),
+          );
+
       });
     }
   }
 
   _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
-    await checkConnection();
-    await checkGps();
-  }
-
-  _onStyleLoadedCallback() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text("Style loaded :)"),
-        backgroundColor: Theme.of(context).primaryColor,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-
-    final url =
-        Uri.https('sigserver4.udg.edu', '/apps/ebatuda/batuda/get/batudes');
-    final fills = await http.read(url);
-    await controller!
-        .addSource("fills", GeojsonSourceProperties(data: jsonDecode(fills)));
-    await controller!.addFillLayer(
-      "fills",
-      "fills",
-      const FillLayerProperties(fillColor: 'red', fillOpacity: 0.5),
-    );
-
-    controller!.addSource("myLocation", GeojsonSourceProperties(data: myLoc));
-
+    var myLoc = createJsonLocation(latitude, longitude);
+    print('..............................');
+    print(myLoc);
+    print('..............................');
+    await controller!.addSource("myLocation", GeojsonSourceProperties(data: myLoc));
     await controller!.addCircleLayer(
       "myLocation",
       "myLocation",
@@ -149,7 +137,44 @@ class FullMapState extends State<FullMap> {
         circleRadius: 10,
         circleColor: Colors.blue.toHexStringRGB(),
       ),
-    );
+    );  
+    await checkConnection(context);
+    await checkGps();
+  }
+
+  _onStyleLoadedCallback() async {
+    if (!hasInternet) {
+      return;
+    }
+
+    final url =
+        Uri.https('sigserver4.udg.edu', '/apps/ebatuda/batuda/get/batudes');
+
+    final fills = await http.read(url);
+    final sources = await controller!.getSourceIds();
+
+    if (!sources.contains('fills')){
+      await controller!
+          .addSource("fills", GeojsonSourceProperties(data: jsonDecode(fills)));
+
+      await controller!.addFillLayer(
+        "fills",
+        "fills",
+        const FillLayerProperties(fillColor: 'red', fillOpacity: 0.5),
+      );
+      await controller!.removeLayer('myLocation');
+      await controller!.removeSource('myLocation');
+      
+      await controller!.addSource("myLocation", GeojsonSourceProperties(data: createJsonLocation(latitude, longitude)));
+      await controller!.addCircleLayer(
+        "myLocation",
+        "myLocation",
+        CircleLayerProperties(
+          circleRadius: 10,
+          circleColor: Colors.blue.toHexStringRGB(),
+        ),
+      );        
+    }   
   }
 
   @override
