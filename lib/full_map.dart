@@ -46,7 +46,7 @@ class FullMapState extends State<FullMap> {
   @override
   void initState() {
     super.initState(); //comes first for initState();
-    
+
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
           setState(() {
@@ -58,7 +58,7 @@ class FullMapState extends State<FullMap> {
             hasInternet = true;
           });
         snackBarConnectionRestored(context);
-        _onStyleLoadedCallback();
+        // _onStyleLoadedCallback();
       }
     });
 
@@ -74,6 +74,12 @@ class FullMapState extends State<FullMap> {
 
   }
 
+  @override
+  void dispose() async {
+     await BackgroundLocation.stopLocationService();
+     super.dispose();
+  }
+
   loc.Location location =
       loc.Location(); //explicit reference to the Location class
 
@@ -83,81 +89,36 @@ class FullMapState extends State<FullMap> {
     }
 
     gpsEnabled = await location.serviceEnabled();
-
-    if (gpsEnabled) {
-      await BackgroundLocation.setAndroidNotification(
-        title: 'Background service is running',
-        message: 'Background location in progress',
-      );
-
-      await BackgroundLocation.startLocationService(distanceFilter: 1);
-      BackgroundLocation.getLocationUpdates((location) {
-        
-        setState(() {
-          latitude = location.latitude;
-          longitude = location.longitude;
-          accuracy = location.accuracy;
-          altitude = location.altitude;
-          bearing = location.bearing;
-          speed = location.speed;
-          time = location.time;
-        });
-
-        final newLoc = LatLng(location.latitude!, location.longitude!);
-
-        controller!.setGeoJsonSource("myLocation", {
-          "type": "FeatureCollection",
-          "features": [
-            {
-              "type": "Feature",
-              "properties": {},
-              "geometry": {
-                "coordinates": [location.longitude, location.latitude],
-                "type": "Point"
-              }
-            }
-          ]
-        });
-
-        controller!.animateCamera(
-            CameraUpdate.newLatLng(newLoc)
-          )
-          .then(
-            (result) => debugPrint(
-                "mapController.animateCamera() returned $result"),
-          );
-
-      });
+    if (gpsEnabled){
+          await BackgroundLocation.stopLocationService(); //To ensure that previously started services have been stopped, if desired
+          await BackgroundLocation.startLocationService(distanceFilter: 1);
     }
+    // if (gpsEnabled) {
+    //   await BackgroundLocation.setAndroidNotification(
+    //     title: 'Background service is running',
+    //     message: 'Background location in progress',
+    //   );
+      
+    // }
   }
 
-  _onMapCreated(MapLibreMapController mapController) async {
+  void _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
-    print('????????????????????????');
-    print(location);
-    var myLoc = createJsonLocation(latitude!, longitude!);
-    await controller!.addSource("myLocation", GeojsonSourceProperties(data: myLoc));
-    await controller!.addCircleLayer(
-      "myLocation",
-      "myLocation",
-      CircleLayerProperties(
-        circleRadius: 10,
-        circleColor: Colors.blue.toHexStringRGB(),
-      ),
-    );  
     await checkConnection(context);
-    await checkGps();
+    
   }
 
   _onStyleLoadedCallback() async {
-    if (!hasInternet) {
+    if (!hasInternet || controller == null) {
       return;
     }
-
+    await checkGps();
     final url =
         Uri.https('sigserver4.udg.edu', '/apps/ebatuda/batuda/get/batudes');
 
     final fills = await http.read(url);
+    
+
     final sources = await controller!.getSourceIds();
 
     if (!sources.contains('fills')){
@@ -169,25 +130,76 @@ class FullMapState extends State<FullMap> {
         "fills",
         const FillLayerProperties(fillColor: 'red', fillOpacity: 0.5),
       );
-      await controller!.removeLayer('myLocation');
-      await controller!.removeSource('myLocation');
-      
-      await controller!.addSource("myLocation", GeojsonSourceProperties(data: createJsonLocation(latitude, longitude)));
-      await controller!.addCircleLayer(
-        "myLocation",
-        "myLocation",
-        CircleLayerProperties(
-          circleRadius: 10,
-          circleColor: Colors.blue.toHexStringRGB(),
-        ),
-      );        
-    }   
+              
+    } 
+    
+    await controller!.addSource("myLocation", GeojsonSourceProperties(data: myLoc));
+    await controller!.addCircleLayer(
+          "myLocation",
+          "myLocation",
+          CircleLayerProperties(
+            circleRadius: 10,
+            circleColor: Colors.blue.toHexStringRGB(),
+          ),
+        );        
+
+    if (gpsEnabled)  {
+      BackgroundLocation.getLocationUpdates((location) {
+        showNewLocation(location);
+      }); 
+    }
+   
+  }
+
+  void showNewLocation(location){
+    print('.............................................................................');
+    latitude = location.latitude;
+    longitude = location.longitude;
+    accuracy = location.accuracy;
+    altitude = location.altitude;
+    bearing = location.bearing;
+    speed = location.speed;
+    time = location.time;        
+    npoints++;
+
+
+    final newLoc = LatLng(location.latitude!, location.longitude!);
+
+    controller!.setGeoJsonSource("myLocation", {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {},
+          "geometry": {
+            "coordinates": [location.longitude, location.latitude],
+            "type": "Point"
+          }
+        }
+      ]
+    });
+
+    print(latitude);
+    print(longitude);
+    print(altitude);
+    print(bearing);
+    print(speed);
+    print(time);
+    print(npoints);
+    controller!.animateCamera(
+        CameraUpdate.newLatLng(newLoc)
+      )
+      .then(
+        (result) => debugPrint(
+            "mapController.animateCamera() returned $result"),
+      );
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text(npoints.toString())),
+        appBar: AppBar(title: Text('${npoints.toString()} captured points')),
         body: MapLibreMap(
           // myLocationEnabled: true,
           trackCameraPosition: true,
@@ -207,13 +219,6 @@ class FullMapState extends State<FullMap> {
 var myLoc = {
   "type": "FeatureCollection",
   "features": [
-    {
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "coordinates": [2.8253603076996683, 41.98536120732385],
-        "type": "Point"
-      }
-    }
+
   ]
 };
