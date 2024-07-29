@@ -5,12 +5,13 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:http/http.dart' as http;
 import 'page.dart';
 import 'snackbars.dart';
-import 'createJsonLocation.dart';
 import 'dart:convert';
 import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:geodart/geometries.dart';
 
+import 'package:audioplayers/audioplayers.dart';
 
 class FullMapPage extends ExamplePage {
   const FullMapPage({super.key})
@@ -34,6 +35,8 @@ class FullMapState extends State<FullMap> {
   MapLibreMapController? controller;
   int npoints = 0;
   var isLight = true;
+  String fills = '';
+  Map jsonBatudes={};
   double? latitude = 0;
   double? longitude = 0;
   double? accuracy = 0;
@@ -42,11 +45,14 @@ class FullMapState extends State<FullMap> {
   double? speed = 0;
   double? time = 0;
   bool hasInternet = false;
+  MultiPolygon? geodartMultiPolygon;
+  late AudioPlayer player = AudioPlayer();
+
 
   @override
   void initState() {
     super.initState(); //comes first for initState();
-
+    player = AudioPlayer();
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
           setState(() {
@@ -116,19 +122,23 @@ class FullMapState extends State<FullMap> {
     final url =
         Uri.https('sigserver4.udg.edu', '/apps/ebatuda/batuda/get/batudes');
 
-    final fills = await http.read(url);
+    fills = await http.read(url);
     
-
     final sources = await controller!.getSourceIds();
 
     if (!sources.contains('fills')){
+      jsonBatudes = jsonDecode(fills);
       await controller!
-          .addSource("fills", GeojsonSourceProperties(data: jsonDecode(fills)));
+          .addSource("fills", GeojsonSourceProperties(data: jsonBatudes));
 
       await controller!.addFillLayer(
         "fills",
         "fills",
-        const FillLayerProperties(fillColor: 'red', fillOpacity: 0.5),
+        const FillLayerProperties(
+          // fillPattern: 'stripes', fillOpacity: 1),
+          fillColor: "yellow",
+          fillOutlineColor: "#000000",
+        )
       );
               
     } 
@@ -151,8 +161,12 @@ class FullMapState extends State<FullMap> {
    
   }
 
+  Future<void> playAlarm() async{
+    String audioPath = 'audio/alarm.mp3';
+    await player.play(AssetSource(audioPath));
+  }
+
   void showNewLocation(location){
-    print('.............................................................................');
     latitude = location.latitude;
     longitude = location.longitude;
     accuracy = location.accuracy;
@@ -162,8 +176,33 @@ class FullMapState extends State<FullMap> {
     time = location.time;        
     npoints++;
 
-
     final newLoc = LatLng(location.latitude!, location.longitude!);
+    final pointJson = {
+          "type": "Feature",
+          "properties": {},
+          "geometry": {
+            "coordinates": [location.longitude, location.latitude],
+            "type": "Point"
+          }
+        };
+
+    Point current = Point.fromJson(pointJson);
+    if (jsonBatudes.containsKey('features')) {
+      for (var i=0; i < jsonBatudes['features'].length; i++) {
+        geodartMultiPolygon = MultiPolygon.fromJson(jsonBatudes['features'][i]);
+        bool dangerZone = geodartMultiPolygon!.contains(current);
+        print('..............................');
+        print('DANGER ZONE $dangerZone');
+        print(geodartMultiPolygon);
+        print(current);
+        print('..............................');
+        if (dangerZone) {
+          playAlarm();
+          continue;
+        }
+      }
+    }
+
 
     controller!.setGeoJsonSource("myLocation", {
       "type": "FeatureCollection",
@@ -179,13 +218,6 @@ class FullMapState extends State<FullMap> {
       ]
     });
 
-    print(latitude);
-    print(longitude);
-    print(altitude);
-    print(bearing);
-    print(speed);
-    print(time);
-    print(npoints);
     controller!.animateCamera(
         CameraUpdate.newLatLng(newLoc)
       )
@@ -199,7 +231,14 @@ class FullMapState extends State<FullMap> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('${npoints.toString()} captured points')),
+        appBar: AppBar(title: Text('${npoints.toString()} captured points'), actions: [
+          IconButton(
+            icon: const Icon(Icons.alarm),
+            onPressed: () {
+              player.stop();
+            },
+          ),
+        ],),
         body: MapLibreMap(
           // myLocationEnabled: true,
           trackCameraPosition: true,
