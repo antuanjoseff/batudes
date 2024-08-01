@@ -138,6 +138,7 @@ class FullMapState extends State<FullMap> {
           // fillPattern: 'stripes', fillOpacity: 1),
           fillColor: "yellow",
           fillOutlineColor: "#000000",
+          
         )
       );
               
@@ -163,6 +164,7 @@ class FullMapState extends State<FullMap> {
 
   Future<void> playAlarm() async{
     String audioPath = 'audio/alarm.mp3';
+    player.setVolume(1);
     await player.play(AssetSource(audioPath));
   }
 
