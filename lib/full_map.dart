@@ -45,6 +45,10 @@ class FullMapState extends State<FullMap> {
   double? speed = 0;
   double? time = 0;
   bool hasInternet = false;
+  bool justIn = false;
+  bool justOut = false;
+  bool inDanger = false;
+  bool playMode = true;
   MultiPolygon? geodartMultiPolygon;
   late AudioPlayer player = AudioPlayer();
 
@@ -111,7 +115,6 @@ class FullMapState extends State<FullMap> {
   void _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
     await checkConnection(context);
-    
   }
 
   _onStyleLoadedCallback() async {
@@ -192,16 +195,26 @@ class FullMapState extends State<FullMap> {
     if (jsonBatudes.containsKey('features')) {
       for (var i=0; i < jsonBatudes['features'].length; i++) {
         geodartMultiPolygon = MultiPolygon.fromJson(jsonBatudes['features'][i]);
-        bool dangerZone = geodartMultiPolygon!.contains(current);
-        print('..............................');
-        print('DANGER ZONE $dangerZone');
-        print(geodartMultiPolygon);
-        print(current);
-        print('..............................');
-        if (dangerZone) {
-          playAlarm();
+
+        bool currentState = geodartMultiPolygon!.contains(current);
+
+        if (currentState) {
+          if (!inDanger){
+            justIn = true;
+            justOut = false;
+          }
+          if (playMode) {
+            playAlarm();
+          }
           continue;
+        } else {
+          if (inDanger) {
+            justOut = true;
+            justIn = false;
+            playMode = true; // Reset play mode
+          }
         }
+        inDanger = currentState;
       }
     }
 
@@ -233,17 +246,19 @@ class FullMapState extends State<FullMap> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('${npoints.toString()} captured points'), actions: [
+        appBar: AppBar(title: Text('(${npoints.toString()}) (${accuracy!.floor()}m accuracy)'), actions: [
           IconButton(
-            icon: const Icon(Icons.alarm),
+            icon: playMode ? const Icon(Icons.notifications_active) : const Icon(Icons.notifications_none),
             onPressed: () {
+              playMode = !playMode;
               player.stop();
+              setState((){});
             },
           ),
         ],),
         body: MapLibreMap(
           // myLocationEnabled: true,
-          trackCameraPosition: true,
+          trackCameraPosition: false,
           onMapCreated: _onMapCreated,
           initialCameraPosition: const CameraPosition(
             target: LatLng(42.0, 3.0),
