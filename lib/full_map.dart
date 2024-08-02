@@ -32,8 +32,12 @@ class FullMap extends StatefulWidget {
 
 class FullMapState extends State<FullMap> {
   bool gpsEnabled = false;
+  bool mapIsCentered = true;
   MapLibreMapController? controller;
+  bool _scrollGesturesEnabled = true;
+  bool trackCameroMove = true;
   int npoints = 0;
+  int panTime = 0;
   var isLight = true;
   String fills = '';
   Map jsonBatudes={};
@@ -49,9 +53,13 @@ class FullMapState extends State<FullMap> {
   bool justOut = false;
   bool inDanger = false;
   bool playMode = true;
+  bool _isMoving = false;
+  bool justStop = false;
+  bool justMoved = false;
+  LatLng? currentLocation;
   MultiPolygon? geodartMultiPolygon;
   late AudioPlayer player = AudioPlayer();
-
+  final stopwatch = Stopwatch();
 
   @override
   void initState() {
@@ -114,7 +122,39 @@ class FullMapState extends State<FullMap> {
 
   void _onMapCreated(MapLibreMapController mapController) async {
     controller = mapController;
+    controller!.addListener(_onMapChanged);
     await checkConnection(context);
+  }
+
+
+  void _onMapChanged() {
+    setState(() {
+      _extractMapInfo();
+    });
+  }
+
+  void _extractMapInfo() {
+    final position = controller!.cameraPosition;
+    _isMoving = controller!.isCameraMoving;
+    if (_isMoving) {
+      if (!justMoved){
+        justMoved = true;
+        stopwatch.start();
+      }
+    } else {
+      justMoved = false;
+      justStop = true;
+      panTime = stopwatch.elapsedMilliseconds;
+      stopwatch.stop();
+      stopwatch.reset();
+      print('............................................');
+      print('doSomething() executed in $panTime');
+      print('$trackCameroMove');
+      if (trackCameroMove && panTime > 200) {
+        mapIsCentered = false;
+      }
+
+    }
   }
 
   _onStyleLoadedCallback() async {
@@ -181,7 +221,7 @@ class FullMapState extends State<FullMap> {
     time = location.time;        
     npoints++;
 
-    final newLoc = LatLng(location.latitude!, location.longitude!);
+    currentLocation = LatLng(location.latitude!, location.longitude!);
     final pointJson = {
           "type": "Feature",
           "properties": {},
@@ -233,22 +273,48 @@ class FullMapState extends State<FullMap> {
       ]
     });
 
-    controller!.animateCamera(
-        CameraUpdate.newLatLng(newLoc)
-      )
-      .then(
-        (result) => debugPrint(
-            "mapController.animateCamera() returned $result"),
-      );
+    trackCameroMove = false;
+    stopwatch.start();
+
+    if (mapIsCentered) {
+      centerCamera(currentLocation);
+    }
+    
     setState(() {});
   }
+
+  void centerCamera(location){
+    controller!.animateCamera(
+        CameraUpdate.newLatLng(location), duration: const Duration(milliseconds: 100),
+      )
+      .then(
+        (result) {
+          print('........................animate camera');
+          print(stopwatch.elapsedMilliseconds);
+          stopwatch.stop();
+          stopwatch.reset();
+          trackCameroMove = true;
+          debugPrint(
+            "mapController.animateCamera() returned $result");
+        });
+  }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('(${npoints.toString()}) (${accuracy!.floor()}m accuracy)'), actions: [
+        appBar: AppBar(title: Text('(${npoints.toString()}) (${accuracy!.floor()}m $panTime)'), actions: [
+          if (!mapIsCentered)
+            IconButton(
+              icon:const Icon(Icons.adjust),
+              onPressed: () {
+                mapIsCentered = true;
+                centerCamera(currentLocation);
+                setState((){});
+              },
+            ),
           IconButton(
-            icon: playMode ? const Icon(Icons.notifications_active) : const Icon(Icons.notifications_none),
+            icon: playMode ? const Icon(Icons.notifications_active) : const Icon(Icons.notifications_off),
             onPressed: () {
               playMode = !playMode;
               player.stop();
@@ -258,8 +324,9 @@ class FullMapState extends State<FullMap> {
         ],),
         body: MapLibreMap(
           // myLocationEnabled: true,
-          trackCameraPosition: false,
+          trackCameraPosition: true,
           onMapCreated: _onMapCreated,
+          scrollGesturesEnabled: _scrollGesturesEnabled,
           initialCameraPosition: const CameraPosition(
             target: LatLng(42.0, 3.0),
             zoom: 13.0,
