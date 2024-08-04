@@ -29,7 +29,7 @@ void snackBarConnectionRestored (context) {
                   Icon(Icons.thumb_up, color: Colors.white),
                   SizedBox(width: 20),
                   Expanded(
-                    child: Text("Connection restord")
+                    child: Text("Connection restored")
                   )
                 ],
               ),

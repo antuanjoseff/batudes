@@ -32,7 +32,9 @@ class FullMap extends StatefulWidget {
 
 class FullMapState extends State<FullMap> {
   bool gpsEnabled = false;
-  bool mapIsCentered = true;
+  bool mapCentered = true;
+  bool northUp = false;
+  bool fullScreen = false;
   MapLibreMapController? controller;
   bool _scrollGesturesEnabled = true;
   bool trackCameroMove = true;
@@ -45,7 +47,8 @@ class FullMapState extends State<FullMap> {
   double? longitude = 0;
   double? accuracy = 0;
   double? altitude = 0;
-  double? bearing = 0;
+  double bearing = 0;
+  double bearingFromGps = 0;
   double? speed = 0;
   double? time = 0;
   bool hasInternet = false;
@@ -72,6 +75,8 @@ class FullMapState extends State<FullMap> {
           });
         snackBarConnectionLost(context);          
       } else {
+        // TODO
+        // GET LAST POSITION AND CHECK FOR DANGER ZONE
           setState(() {
             hasInternet = true;
           });
@@ -128,13 +133,13 @@ class FullMapState extends State<FullMap> {
 
 
   void _onMapChanged() {
-    setState(() {
-      _extractMapInfo();
-    });
+    _extractMapInfo();
   }
 
   void _extractMapInfo() {
     final position = controller!.cameraPosition;
+    bearing = position!.bearing;
+    
     _isMoving = controller!.isCameraMoving;
     if (_isMoving) {
       if (!justMoved){
@@ -147,14 +152,12 @@ class FullMapState extends State<FullMap> {
       panTime = stopwatch.elapsedMilliseconds;
       stopwatch.stop();
       stopwatch.reset();
-      print('............................................');
-      print('doSomething() executed in $panTime');
-      print('$trackCameroMove');
-      if (trackCameroMove && panTime > 200) {
-        mapIsCentered = false;
-      }
 
+      if (trackCameroMove && panTime > 200) {
+        mapCentered = false;
+      }
     }
+    setState((){});
   }
 
   _onStyleLoadedCallback() async {
@@ -211,22 +214,12 @@ class FullMapState extends State<FullMap> {
     await player.play(AssetSource(audioPath));
   }
 
-  void showNewLocation(location){
-    latitude = location.latitude;
-    longitude = location.longitude;
-    accuracy = location.accuracy;
-    altitude = location.altitude;
-    bearing = location.bearing;
-    speed = location.speed;
-    time = location.time;        
-    npoints++;
-
-    currentLocation = LatLng(location.latitude!, location.longitude!);
-    final pointJson = {
+  void locationInPolygons () {
+final pointJson = {
           "type": "Feature",
           "properties": {},
           "geometry": {
-            "coordinates": [location.longitude, location.latitude],
+            "coordinates": [currentLocation!.longitude, currentLocation!.latitude],
             "type": "Point"
           }
         };
@@ -256,7 +249,24 @@ class FullMapState extends State<FullMap> {
         }
         inDanger = currentState;
       }
-    }
+    }    
+  }
+
+  void showNewLocation(location){
+    latitude = location.latitude;
+    longitude = location.longitude;
+    accuracy = location.accuracy;
+    altitude = location.altitude;
+    bearing = location.bearing;
+    bearingFromGps = location.bearing;
+    bearing = bearingFromGps;
+    speed = location.speed;
+    time = location.time;        
+    npoints++;
+
+    currentLocation = LatLng(location.latitude!, location.longitude!);
+
+    locationInPolygons();
 
 
     controller!.setGeoJsonSource("myLocation", {
@@ -276,26 +286,33 @@ class FullMapState extends State<FullMap> {
     trackCameroMove = false;
     stopwatch.start();
 
-    if (mapIsCentered) {
+    if (mapCentered) {
       centerCamera(currentLocation);
     }
     
     setState(() {});
   }
 
+  void setCameraBearing(degrees){
+    print('=================================CAMERA BEARING ===========$degrees');
+    controller!.animateCamera(
+      CameraUpdate.bearingTo(degrees), duration: const Duration(milliseconds: 100),
+    );
+  }
+
   void centerCamera(location){
+    
     controller!.animateCamera(
         CameraUpdate.newLatLng(location), duration: const Duration(milliseconds: 100),
       )
       .then(
         (result) {
-          print('........................animate camera');
-          print(stopwatch.elapsedMilliseconds);
           stopwatch.stop();
           stopwatch.reset();
           trackCameroMove = true;
-          debugPrint(
-            "mapController.animateCamera() returned $result");
+          if (!northUp) {
+            setCameraBearing(bearingFromGps);
+          }
         });
   }
 
@@ -303,38 +320,94 @@ class FullMapState extends State<FullMap> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('(${npoints.toString()}) (${accuracy!.floor()}m $panTime)'), actions: [
-          if (!mapIsCentered)
-            IconButton(
-              icon:const Icon(Icons.adjust),
-              onPressed: () {
-                mapIsCentered = true;
-                centerCamera(currentLocation);
+        appBar: !fullScreen ? AppBar(title: Text('$npoints ${accuracy!.floor()}m $bearingFromGps')) : null,
+        body: Stack(
+          children: [
+            MapLibreMap(compassEnabled: false,
+              // myLocationEnabled: true,
+              trackCameraPosition: true,
+              onMapCreated: _onMapCreated,
+              onMapLongClick: (point, coordinates) {
+                fullScreen = !fullScreen;
                 setState((){});
               },
+              scrollGesturesEnabled: _scrollGesturesEnabled,
+              initialCameraPosition: const CameraPosition(
+                target: LatLng(42.0, 3.0),
+                zoom: 13.0,
+              ),
+              onStyleLoadedCallback: _onStyleLoadedCallback,
+              styleString:
+                  // 'https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris_simplificat.json',
+                  'https://geoserveis.icgc.cat/contextmaps/icgc_orto_hibrida.json',
             ),
-          IconButton(
-            icon: playMode ? const Icon(Icons.notifications_active) : const Icon(Icons.notifications_off),
-            onPressed: () {
-              playMode = !playMode;
-              player.stop();
-              setState((){});
-            },
-          ),
-        ],),
-        body: MapLibreMap(
-          // myLocationEnabled: true,
-          trackCameraPosition: true,
-          onMapCreated: _onMapCreated,
-          scrollGesturesEnabled: _scrollGesturesEnabled,
-          initialCameraPosition: const CameraPosition(
-            target: LatLng(42.0, 3.0),
-            zoom: 13.0,
-          ),
-          onStyleLoadedCallback: _onStyleLoadedCallback,
-          styleString:
-              // 'https://geoserveis.icgc.cat/contextmaps/icgc_mapa_base_gris_simplificat.json',
-              'https://geoserveis.icgc.cat/contextmaps/icgc_orto_hibrida.json',
+           Padding(
+             padding: const EdgeInsets.all(8.0),
+             child: Row(
+               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      RotationTransition(
+                        turns: AlwaysStoppedAnimation(northUp ? 0 : (-1*bearing / 360)),
+                        child: CircleAvatar(
+                          backgroundColor: Color(0xffffffff), 
+                          child: IconButton(
+                              icon: const Icon(Icons.north, color: Colors.red),
+                              onPressed: () {
+                                northUp = !northUp;
+                                if (!northUp){
+                                  bearing = bearingFromGps;
+                                } else {
+                                  bearing = 0;
+                                }
+                                setCameraBearing(bearing);
+                                // print('---------------- $northUp --------------------');
+                                // setState((){});
+                              },
+                            ),
+                        ),
+                      ),
+                      const SizedBox(
+                        height: 5
+                      ),
+                      if (!mapCentered)
+                        CircleAvatar(
+                          backgroundColor: Color(0xffffffff), 
+                          child: IconButton(
+                            icon:const Icon(Icons.adjust, color: Colors.red),
+                            onPressed: () {
+                              mapCentered = true;
+                              centerCamera(currentLocation);
+                              setState((){});
+                            },
+                          ),
+                        ),
+                      
+                    ],
+                  ),
+                 Positioned(
+                   top: 5,
+                   right: 10,
+                   child: CircleAvatar(
+                     backgroundColor: playMode ? Color(0xffff0000) : Color(0xffffffff),
+                     child: IconButton(
+                        icon: playMode ? const Icon(Icons.notifications_active, color: Colors.white,) : const Icon(Icons.notifications_off, color: Colors.grey,),
+                        onPressed: () {
+                          playMode = !playMode;
+                          player.stop();
+                          setState((){});
+                        },
+                      ),
+                   ),
+                 ),
+               ],
+             ),
+           ),
+          ],
         ));
   }
 }
