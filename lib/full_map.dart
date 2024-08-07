@@ -320,7 +320,11 @@ final pointJson = {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: !fullScreen ? AppBar(title: Text('$npoints ${accuracy!.floor()}m $bearingFromGps')) : null,
+        // appBar: !fullScreen ? AppBar(title: Text('$npoints ${accuracy!.floor()}m $bearingFromGps')) : null,
+        appBar: AppBar(
+          toolbarHeight: !fullScreen ? 40 : 0, 
+          title: Text('$npoints ${accuracy!.floor()}m $bearingFromGps')
+          ),
         body: Stack(
           children: [
             MapLibreMap(compassEnabled: false,
@@ -389,10 +393,7 @@ final pointJson = {
                       
                     ],
                   ),
-                 Positioned(
-                   top: 5,
-                   right: 10,
-                   child: CircleAvatar(
+                  CircleAvatar(
                      backgroundColor: playMode ? Color(0xffff0000) : Color(0xffffffff),
                      child: IconButton(
                         icon: playMode ? const Icon(Icons.notifications_active, color: Colors.white,) : const Icon(Icons.notifications_off, color: Colors.grey,),
@@ -403,7 +404,7 @@ final pointJson = {
                         },
                       ),
                    ),
-                 ),
+                 
                ],
              ),
            ),
