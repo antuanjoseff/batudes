@@ -10,8 +10,8 @@ import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geodart/geometries.dart';
-
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:volume_controller/volume_controller.dart';
 
 class FullMapPage extends ExamplePage {
   const FullMapPage({super.key})
@@ -61,13 +61,12 @@ class FullMapState extends State<FullMap> {
   bool justMoved = false;
   LatLng? currentLocation;
   MultiPolygon? geodartMultiPolygon;
-  late AudioPlayer player = AudioPlayer();
+  
   final stopwatch = Stopwatch();
 
   @override
   void initState() {
     super.initState(); //comes first for initState();
-    player = AudioPlayer();
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
           setState(() {
@@ -209,9 +208,14 @@ class FullMapState extends State<FullMap> {
   }
 
   Future<void> playAlarm() async{
-    String audioPath = 'audio/alarm.mp3';
-    player.setVolume(1);
-    await player.play(AssetSource(audioPath));
+    VolumeController().setVolume(1.0);
+    FlutterRingtonePlayer().play(
+      android: AndroidSounds.notification,
+      ios: IosSounds.glass,
+      looping: true, // Android only - API >= 28
+      volume: 0.8, // Android only - API >= 28
+      asAlarm: false, // Android only - all APIs
+    );    
   }
 
   void locationInPolygons () {
@@ -399,7 +403,7 @@ final pointJson = {
                         icon: playMode ? const Icon(Icons.notifications_active, color: Colors.white,) : const Icon(Icons.notifications_off, color: Colors.grey,),
                         onPressed: () {
                           playMode = !playMode;
-                          player.stop();
+                          
                           setState((){});
                         },
                       ),
