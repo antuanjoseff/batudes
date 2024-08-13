@@ -10,8 +10,13 @@ import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geodart/geometries.dart';
+<<<<<<< HEAD
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:volume_controller/volume_controller.dart';
+=======
+import 'package:volume_controller/volume_controller.dart';
+import 'package:audioplayers/audioplayers.dart';
+>>>>>>> alarm
 
 class FullMapPage extends ExamplePage {
   const FullMapPage({super.key})
@@ -67,6 +72,11 @@ class FullMapState extends State<FullMap> {
   @override
   void initState() {
     super.initState(); //comes first for initState();
+<<<<<<< HEAD
+=======
+    VolumeController().showSystemUI = false;
+    player = AudioPlayer();
+>>>>>>> alarm
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
           setState(() {
@@ -208,6 +218,7 @@ class FullMapState extends State<FullMap> {
   }
 
   Future<void> playAlarm() async{
+<<<<<<< HEAD
     VolumeController().setVolume(1.0);
     FlutterRingtonePlayer().play(
       android: AndroidSounds.notification,
@@ -216,6 +227,11 @@ class FullMapState extends State<FullMap> {
       volume: 0.8, // Android only - API >= 28
       asAlarm: false, // Android only - all APIs
     );    
+=======
+    String audioPath = 'audio/alarm.mp3';
+    VolumeController().maxVolume();
+    await player.play(AssetSource(audioPath));
+>>>>>>> alarm
   }
 
   void locationInPolygons () {
