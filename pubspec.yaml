@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  volume_controller: ^2.0.8
   geodart: ^0.3.6
   audioplayers: ^6.0.0
   connectivity_plus: ^4.0.1

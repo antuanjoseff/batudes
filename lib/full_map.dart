@@ -10,7 +10,7 @@ import 'package:background_location/background_location.dart';
 import 'package:location/location.dart' as loc;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geodart/geometries.dart';
-
+import 'package:volume_controller/volume_controller.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class FullMapPage extends ExamplePage {
@@ -67,6 +67,7 @@ class FullMapState extends State<FullMap> {
   @override
   void initState() {
     super.initState(); //comes first for initState();
+    VolumeController().showSystemUI = false;
     player = AudioPlayer();
     Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (result == ConnectivityResult.none) {
@@ -210,7 +211,7 @@ class FullMapState extends State<FullMap> {
 
   Future<void> playAlarm() async{
     String audioPath = 'audio/alarm.mp3';
-    player.setVolume(1);
+    VolumeController().maxVolume();
     await player.play(AssetSource(audioPath));
   }
 
